@@ -1,13 +1,24 @@
-from datetime import datetime
+import os
 
-# make CSV file name from these params
-time_stamp = datetime.now().strftime("%d%m%Y_%H%M%S")
-filename = f'logfile_{time_stamp}.csv'
-logfile = open(filename, 'w')
-# logfile.write('time, alt, fuel, vs, hs, distance, angle, engine\n')
-# self.logfile.write(
-#                 f'{self.time}, {self.altitude}, {self.fuel}, {self.vertical_speed}, {self.horizontal_speed}, {self.distance}, {self.angle}, {int(self.engine_is_on)}\n')
+from scan_photo import *
+
+def list_images(path="."):
+    image_list = []
+    for file in os.listdir(path):
+        if file.endswith(".jpg"):
+            # print(os.path.join("/.", file))
+            image_list.append(os.path.join(path, file))
+    return image_list
+
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    pass
+    image_list  = list_images()
+    for img_name in image_list:
+        scan_img = scan_image(img_name, threshold=190,s_min=10,s_max=250)
+
+
+    # images = np.concatenate((orig_img, scan_img), axis=1)
+    # cv2.imshow("img", images)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
