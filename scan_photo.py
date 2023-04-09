@@ -24,7 +24,7 @@ def rotate_image(image):
     return cv2.rotate(image, cv2.ROTATE_180)
 
 
-def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=False):
+def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=False, draw_graph_flag=False):
     image = load_image(img_name)
     if rotate:
         image = rotate_image(image)
@@ -44,6 +44,7 @@ def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=F
     # filter by area
     i = 1
     p = []
+    b = []
     for c in contours:
         area = cv2.contourArea(c)
         if s_min < area < s_max:
@@ -52,24 +53,28 @@ def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=F
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
             p.append((cx, cy))
+            brightness = round(image[cy,cx] / 255, 2)
+            b.append(brightness)
 
             cv2.circle(th_img, (cx, cy), 40, (255, 0, 0), 3)
             cv2.putText(th_img, f'{i}', (cx - 20, cy - 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 0, 0), 3)
-            logfile.write(f'{i}, {cx}, {cy}, {area}, {image[cy,cx] / 255}\n')
+            logfile.write(f'{i}, {cx}, {cy}, {area}, {brightness}\n')
             i += 1
 
     # save images
     images = np.concatenate((image, th_img), axis=1)
     cv2.imwrite(f'./output/{image_name}_th.jpg', images)
 
-    trees = create_mst(np.asarray(p), radius, image_name)
+    trees = create_mst(np.asarray(p), radius, b, image_name, draw_graph_flag)
 
     # return the threshold image
     return trees, th_img, p
 
 
-def create_mst(data, radius=1000, image_name="_"):
+def create_mst(data, radius=1000, brightness=None, image_name="_", draw_graph_flag=False):
     # distance matrix
+    if brightness is None:
+        brightness = []
     dist = distance.cdist(data, data, 'euclidean')
     # ignore diagonal values
     np.fill_diagonal(dist, np.nan)
@@ -88,11 +93,19 @@ def create_mst(data, radius=1000, image_name="_"):
         # G.add_edges_from(paires)
         vxs = list()
         edges = list()
+        once = True
         for vx in paires:
             if vx[0] != ind:
                 continue
-            vxs.append(vx[0]+1)
-            edges.append((vx[0]+1, vx[1]+1, int(dist[vx[0], vx[1]])))
+            if once:
+                vxs.append((vx[0], {'bright': brightness[vx[0]]}))
+                once = False
+            if len(brightness) > ind:
+                vxs.append((vx[1], {'bright' : brightness[vx[1]]}))
+            else:
+                # vxs.append(vx[0] + 1)
+                exit(1)
+            edges.append((vx[0], vx[1], int(dist[vx[0], vx[1]])))
         G.add_nodes_from(vxs)
         G.add_weighted_edges_from(edges)
         T = nx.minimum_spanning_tree(G)
@@ -100,24 +113,28 @@ def create_mst(data, radius=1000, image_name="_"):
         trees[f'{image_name}_{ind+1}'] = T
 
         # nx.write_weighted_edgelist(T, f'./output/T_{image_name}_{ind+1}.edgelist')
-        #
-        # edge_labels = nx.get_edge_attributes(G, "weight")
-        # # nx.draw(T, with_labels=True, font_weight='bold')
-        # pos = nx.spring_layout(T, seed=0)
-        # nx.draw(
-        #     T, pos, edge_color='black', width=1, linewidths=1,
-        #     node_size=500, node_color='pink', alpha=0.9,
-        #     labels={node: node for node in T.nodes()}
-        # )
-        # nx.draw_networkx_edge_labels(
-        #     T, pos,
-        #     edge_labels=edge_labels,
-        #     font_color='red'
-        # )
-        #
-        # # nx.draw_networkx_edge_labels(T, pos, edge_labels)
-        # plt.savefig(f'./output/{image_name}_{ind+1}_T.jpg')
-        # plt.clf()
+
+        if draw_graph_flag:
+            edge_labels = nx.get_edge_attributes(G, "weight")
+            node_labels = nx.get_node_attributes(G, "bright") # {node: node for node in T.nodes()}
+            for nd in node_labels:
+                node_labels[nd] = f'{nd}\n{node_labels[nd]}'
+            # nx.draw(T, with_labels=True, font_weight='bold')
+            pos = nx.spring_layout(T, seed=0)
+            nx.draw(
+                T, pos, edge_color='black', width=1, linewidths=1,
+                node_size=500, node_color='pink', alpha=0.9,
+                labels=node_labels# {node: node for node in T.nodes()}
+            )
+            nx.draw_networkx_edge_labels(
+                T, pos,
+                edge_labels=edge_labels,
+                font_color='red'
+            )
+
+            # nx.draw_networkx_edge_labels(T, pos, edge_labels)
+            plt.savefig(f'./output/{image_name}_{ind+1}_T.jpg')
+            plt.clf()
     # plt.show()
     return trees
 
@@ -126,8 +143,8 @@ def find_match(scans, names, threshold=100):
     T1 = scans[0][0]
     T2 = scans[1][0]
     # em = iso.categorical_edge_match('weight', 'weight')
-    em = lambda x,y: abs(x['weight'] - y['weight']) < threshold
-    # nm = lambda x, y: abs(x['weight'] - y['weight']) < threshold
+    em = lambda x,y: abs(x['weight'] - y['weight']) <= threshold
+    nm = lambda x, y: abs(x['bright'] - y['bright']) <= 0.3
     matches = []
     for k1 in T1:
         for k2 in T2:
@@ -137,7 +154,7 @@ def find_match(scans, names, threshold=100):
             #     # draw_graph(T2[k2], names)
             #     # plt.show()
             #     # print((k1, k2))
-            if nx.is_isomorphic(T1[k1], T2[k2], edge_match=em):  # match weights
+            if nx.is_isomorphic(T1[k1], T2[k2], node_match=nm, edge_match=em):  # match weights
             # if nx.is_isomorphic(T1[k1], T2[k2]):
                 matches.append((k1, k2))
             else:
@@ -145,7 +162,7 @@ def find_match(scans, names, threshold=100):
                     for n in T1[k1].nodes:
                         T_tmp = nx.Graph(T1[k1])
                         T_tmp.remove_node(n)
-                        if nx.is_isomorphic(T2[k2], T_tmp, edge_match=em):  # match weights
+                        if nx.is_isomorphic(T2[k2], T_tmp, node_match=nm, edge_match=em):  # match weights
                             # if nx.is_isomorphic(T1[k1], T2[k2]):
                             matches.append((k1, k2))
                             break
@@ -153,7 +170,7 @@ def find_match(scans, names, threshold=100):
                     for n in T2[k2].nodes:
                         T_tmp = nx.Graph(T2[k2])
                         T_tmp.remove_node(n)
-                        if nx.is_isomorphic(T1[k1], T_tmp, edge_match=em):  # match weights
+                        if nx.is_isomorphic(T1[k1], T_tmp, node_match=nm, edge_match=em):  # match weights
                             # if nx.is_isomorphic(T1[k1], T2[k2]):
                             matches.append((k1, k2))
                             break
