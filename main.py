@@ -1,5 +1,3 @@
-import os
-
 from scan_photo import *
 
 def list_images(path="."):
@@ -22,16 +20,24 @@ def list_graphs(path="./output"):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    image_list  = list_images()
-    for img_name in image_list:
-        scan_img = scan_image(img_name, threshold=160,s_min=1,s_max=300)
+    image_list = list_images()
+    # settings
+    brightness = 150 # brightness
+    radius = 800 # px
+    s_min = 5 # px
+    s_max = 250 # px
+    dist_error = 50 # px
+    print(f'Settings:\nbrightness: {brightness}\nradius: {radius}\ns_min: {s_min}\ns_max: {s_max}\ndist_error: {dist_error}')
 
-    graph_list = list_graphs()
-    matches = find_match(graph_list)
-    draw_matches()
+    for i in range(len(image_list)):
+        im1_name = image_list[i].strip('./')
+        for j in range(i+1, len(image_list)):
+            im2_name = image_list[j].strip('./')
+            print(f'Match: {im1_name} -> {im2_name}')
 
+            scans = []
+            scans.append(scan_image(im1_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max))
+            scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max))
 
-    # images = np.concatenate((orig_img, scan_img), axis=1)
-    # cv2.imshow("img", images)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+            matches = find_match(scans, (im1_name, im2_name), dist_error)
+            print(f'Results: {matches}')

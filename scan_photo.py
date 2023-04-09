@@ -20,7 +20,7 @@ def load_image(file_name: str):
     return img
 
 
-def scan_image(img_name, threshold=100, s_min=5, s_max=100):
+def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100):
     image = load_image(img_name)
     # make CSV file name from these params
     # time_stamp = datetime.now().strftime("%d%m%Y_%H%M%S")
@@ -52,28 +52,14 @@ def scan_image(img_name, threshold=100, s_min=5, s_max=100):
             logfile.write(f'{i}, {cx}, {cy}, {area}, {image[cy,cx] / 255}\n')
             i += 1
 
-    create_mst(np.asarray(p), 750, image_name)
-
     # save images
     images = np.concatenate((image, th_img), axis=1)
     cv2.imwrite(f'./output/{image_name}_th.jpg', images)
+
+    trees = create_mst(np.asarray(p), radius, image_name)
+
     # return the threshold image
-    return th_img
-
-
-# def neighbors(data, image):
-#     tree = cKDTree(data=data)
-#     K = data.shape[0]
-#     results = tree.query(data, k=K)
-#     distances, indices = results
-#     n = 0
-#     index = indices[n]
-#     neighbours = data[index]
-#
-#     # plt.clf()
-#     # plt.scatter(data[1], data[0], color="red")
-#     # plt.scatter(neighbours[:, 1], neighbours[:, 0], color="blue")
-#     # plt.show()
+    return trees, th_img, p
 
 
 def create_mst(data, radius=1000, image_name="_"):
@@ -88,7 +74,9 @@ def create_mst(data, radius=1000, image_name="_"):
     # neighbors = np.split(paires[:, 1], tmp[1])[1:]
     # indices = tmp[0]
     G = nx.Graph()
+    trees = {}
     for ind in range(len(data)):
+        G.clear()
         paires = np.argwhere(dist <= radius)
         # G.add_nodes_from(indices)
         # G.add_edges_from(paires)
@@ -103,71 +91,74 @@ def create_mst(data, radius=1000, image_name="_"):
         G.add_weighted_edges_from(edges)
         T = nx.minimum_spanning_tree(G)
         sorted(T.edges(data=True))
+        trees[f'{image_name}_{ind+1}'] = T
 
-        nx.write_weighted_edgelist(T, f'./output/T_{image_name}_{ind+1}.edgelist')
-
-        edge_labels = nx.get_edge_attributes(G, "weight")
-        # nx.draw(T, with_labels=True, font_weight='bold')
-        pos = nx.spring_layout(T, seed=0)
-        nx.draw(
-            T, pos, edge_color='black', width=1, linewidths=1,
-            node_size=500, node_color='pink', alpha=0.9,
-            labels={node: node for node in T.nodes()}
-        )
-        nx.draw_networkx_edge_labels(
-            T, pos,
-            edge_labels=edge_labels,
-            font_color='red'
-        )
-
-        # nx.draw_networkx_edge_labels(T, pos, edge_labels)
-        plt.savefig(f'./output/{image_name}_{ind+1}_T.jpg')
-        G.clear()
-        plt.clf()
+        # nx.write_weighted_edgelist(T, f'./output/T_{image_name}_{ind+1}.edgelist')
+        #
+        # edge_labels = nx.get_edge_attributes(G, "weight")
+        # # nx.draw(T, with_labels=True, font_weight='bold')
+        # pos = nx.spring_layout(T, seed=0)
+        # nx.draw(
+        #     T, pos, edge_color='black', width=1, linewidths=1,
+        #     node_size=500, node_color='pink', alpha=0.9,
+        #     labels={node: node for node in T.nodes()}
+        # )
+        # nx.draw_networkx_edge_labels(
+        #     T, pos,
+        #     edge_labels=edge_labels,
+        #     font_color='red'
+        # )
+        #
+        # # nx.draw_networkx_edge_labels(T, pos, edge_labels)
+        # plt.savefig(f'./output/{image_name}_{ind+1}_T.jpg')
+        # plt.clf()
     # plt.show()
+    return trees
 
 
-def find_match(graph_list):
-    T = {}
-    for graph_name in graph_list:
-        f_name = Path(graph_name).name.splitext()[0].strip()
-        T[f_name] = nx.read_weighted_edgelist(graph_name)
-
-    key1 = '3046'
-    key2 = '3047'
-    T1, T2 = {}, {}
-    for key in T:
-        if key1 in key:
-            T1[key] = (T[key])
-        else:
-            T2[key] = (T[key])
-
+def find_match(scans, names, threshold=100):
+    T1 = scans[0][0]
+    T2 = scans[1][0]
     # em = iso.categorical_edge_match('weight', 'weight')
-    em = lambda x,y: abs(x['weight'] - y['weight']) < 100
+    em = lambda x,y: abs(x['weight'] - y['weight']) < threshold
+    # nm = lambda x, y: abs(x['weight'] - y['weight']) < threshold
     matches = []
     for k1 in T1:
         for k2 in T2:
             if nx.is_isomorphic(T1[k1], T2[k2], edge_match=em):  # match weights
             # if nx.is_isomorphic(T1[k1], T2[k2]):
                 matches.append((k1, k2))
-                print(f'isomorphic: {k1}, {k2}')
+                # print(f'isomorphic: {k1}, {k2}')
+
+    th_mg1 = scans[0][1]
+    th_mg1 = cv2.cvtColor(th_mg1, cv2.COLOR_GRAY2RGB)
+    th_mg2 = scans[1][1]
+    th_mg2 = cv2.cvtColor(th_mg2, cv2.COLOR_GRAY2RGB)
+    p1 = scans[0][2]
+    p2 = scans[1][2]
+
+    cv2.putText(th_mg1, names[0],  (100,100) , cv2.FONT_HERSHEY_SIMPLEX, 4, color=(0,0,255), thickness=3)
+    cv2.putText(th_mg2, names[1],  (100,100) , cv2.FONT_HERSHEY_SIMPLEX, 4, color=(0,0,255), thickness=3)
+    w = 75
+    for m in matches:
+        vx1 = m[0].split('_')[-1]
+        vx2 = m[1].split('_')[-1]
+        px1 = p1[int(vx1)-1]
+        px2 = p2[int(vx2)-1]
+        color = np.random.choice(range(256), size=3).tolist()
+        cv2.rectangle(th_mg1, (px1[0] - w, px1[1]- w), (px1[0] + w, px1[1] + w), color=color, thickness=4)
+        cv2.rectangle(th_mg2, (px2[0]- w, px2[1]- w), (px2[0] + w, px2[1] + w), color=color, thickness=4)
+        cv2.putText(th_mg1, f'{vx2}', (px1[0] + 100, px1[1]), cv2.FONT_HERSHEY_SIMPLEX, 3, color=color, thickness=3)
+        cv2.putText(th_mg2, f'{vx1}', (px2[0] + 100, px2[1]), cv2.FONT_HERSHEY_SIMPLEX, 3, color=color, thickness=3)
+
+    white = [255, 255, 255]
+    th_mg1 = cv2.copyMakeBorder(th_mg1, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    th_mg2 = cv2.copyMakeBorder(th_mg2, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    images = np.concatenate((th_mg1, th_mg2), axis=1)
+    nm1 = names[0].split('.')[0]
+    nm2 = names[1].split('.')[0]
+    cv2.imwrite(f'./output/matches_{nm1}_{nm2}.jpg', images)
+
     return matches
 
 
-def draw_matches(matches):
-    im1 = load_image('img_3047_th.jpg')
-    im2 = load_image('img_3047_th.jpg')
-
-def find_local_max(image):
-    h = image.shape[0]
-    w = image.shape[1]
-    local_max = 0
-    y1, x1 = 0, 0
-    # loop over the image, pixel by pixel
-    for y in range(0, h):
-        for x in range(0, w):
-            # threshold the pixel
-            if image[y, x] >= local_max:
-                local_max = image[y, x]
-                y1, x1 = y, x
-    return y1, x1
