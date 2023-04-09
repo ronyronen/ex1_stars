@@ -23,10 +23,10 @@ if __name__ == '__main__':
     image_list = list_images()
     # settings
     brightness = 150 # brightness
-    radius = 800 # px
+    radius = 1000 # px
     s_min = 5 # px
-    s_max = 250 # px
-    dist_error = 50 # px
+    s_max = 300 # px
+    dist_error = 20 # px
     print(f'Settings:\nbrightness: {brightness}\nradius: {radius}\ns_min: {s_min}\ns_max: {s_max}\ndist_error: {dist_error}')
 
     for i in range(len(image_list)):
@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
             scans = []
             scans.append(scan_image(im1_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max))
-            scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max))
+            scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=True))
 
             matches = find_match(scans, (im1_name, im2_name), dist_error)
             print(f'Results: {matches}')
