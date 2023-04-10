@@ -144,7 +144,7 @@ def find_match(scans, names, threshold=100):
     T2 = scans[1][0]
     # em = iso.categorical_edge_match('weight', 'weight')
     em = lambda x,y: abs(x['weight'] - y['weight']) <= threshold
-    nm = lambda x, y: abs(x['bright'] - y['bright']) <= 0.3
+    nm = lambda x, y: abs(x['bright'] - y['bright']) <= 0.5
     matches = []
     for k1 in T1:
         for k2 in T2:
@@ -158,7 +158,8 @@ def find_match(scans, names, threshold=100):
             # if nx.is_isomorphic(T1[k1], T2[k2]):
                 matches.append((k1, k2))
             else:
-                if T1[k1].number_of_nodes() == T2[k2].number_of_nodes() + 1:
+                diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
+                if 0 > diff > 2:
                     for n in T1[k1].nodes:
                         T_tmp = nx.Graph(T1[k1])
                         T_tmp.remove_node(n)
@@ -166,7 +167,7 @@ def find_match(scans, names, threshold=100):
                             # if nx.is_isomorphic(T1[k1], T2[k2]):
                             matches.append((k1, k2))
                             break
-                elif T2[k2].number_of_nodes() == T1[k1].number_of_nodes() + 1:
+                elif -2 < diff <= 0:
                     for n in T2[k2].nodes:
                         T_tmp = nx.Graph(T2[k2])
                         T_tmp.remove_node(n)

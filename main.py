@@ -22,11 +22,11 @@ def list_graphs(path="./output"):
 if __name__ == '__main__':
     image_list = list_images()
     # settings
-    brightness = 145 # brightness
-    radius = 700 # px
-    s_min = 5 # px
+    brightness = 150 # brightness
+    radius = 750 # px
+    s_min = 1 # px
     s_max = 300 # px
-    dist_error = 30 # px
+    dist_error = 20 # px
     print(f'Settings:\nbrightness: {brightness}\nradius: {radius}\ns_min: {s_min}\ns_max: {s_max}\ndist_error: {dist_error}')
 
     for i in range(len(image_list)):
@@ -36,8 +36,8 @@ if __name__ == '__main__':
             print(f'Match: {im1_name} -> {im2_name}')
 
             scans = []
-            scans.append(scan_image(im1_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=False, draw_graph_flag=True))
-            scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=True, draw_graph_flag=True))
+            scans.append(scan_image(im1_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=False, draw_graph_flag=False))
+            scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=False, draw_graph_flag=False))
 
             matches = find_match(scans, (im1_name, im2_name), dist_error)
             print(f'Results: {matches}')
