@@ -28,14 +28,24 @@ Create a library that takes two images and calculates the best match between the
 
 - The library compare each two images and return a matching in case it detect two similar stars in both files. The results are saved into a result file.
 
-## Fine tune
+## Settings
 - There are several configuration options to be used in the app:
   - Image Brightness: Currently this is being calculated based on image intensity. However, this can be modified in case the image is too dark or too bright.
   - Star Area: This parameter set the minmum and maximum area in the umage to be identified as a star. 
   - Radius: this parameter set the star neighbours max distance in pixels.
   - Draw Graph: An option to draw the MST graph: ![fr1_3_T.jpg](examples/fr1_3_T.jpg)
   - Rotate: An option to rotate an image 180 degrees for testing purpose.
- 
+
+## Usage
+- python3 main.py: The application will find all jpg files under the root folder and find a match.
+- python3 main.py <img_name_1> <img_name_2> ... <img_name_n>: The application will use only the images provided.
+
+## Improvements
+- There are some further improvements required in order to perfect the matching process.
+- I've tested two matching algorithms:
+  - Graph Isomorphism.
+  - Own implementation of matching edges and nodes.
+  - Graph isomorphism requires that all the nodes in one graph be present in the second graph. This has caused an issue as there are neighbors that are not present in both graphs. Therefore, I implemented my own matching algorithm that picks the most suitable candidate for a matching.
 
 ## Example
 - Running the application on fr1.jpg and fr2.jpg. i.e.: main.py fr1.jpg fr2.jpg will produce the following:

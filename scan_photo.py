@@ -1,12 +1,9 @@
 import os
-from path import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from scipy.spatial import distance
 import networkx as nx
-import networkx.algorithms.isomorphism as iso
 from numpy.linalg import norm
 
 def load_image(file_name: str):
@@ -187,7 +184,13 @@ def node_match(x, y):
     return nm
 
 
-def find_match(scans, names, threshold=100):
+def find_match_alg1(scans, names):
+    """
+    Own implementation of finding node and edge match
+    :param scans:
+    :param names:
+    :return:
+    """
     T1 = scans[0][0]
     T2 = scans[1][0]
     # em = iso.categorical_edge_match('weight', 'weight')
@@ -224,41 +227,92 @@ def find_match(scans, names, threshold=100):
                         else:
                             matches[k1] = k2, count
 
+    th_mg1 = scans[0][1]
+    th_mg1 = cv2.cvtColor(th_mg1, cv2.COLOR_GRAY2RGB)
+    th_mg2 = scans[1][1]
+    th_mg2 = cv2.cvtColor(th_mg2, cv2.COLOR_GRAY2RGB)
+    p1 = scans[0][2]
+    p2 = scans[1][2]
 
-    # **** #
-    # for k1 in T1:
-    #     for k2 in T2:
-    #         # GM = iso.GraphMatcher(T1[k1], T2[k2], edge_match=em)
-    #         # if GM.subgraph_is_isomorphic():
-    #         #     # draw_graph(T1[k1], names)
-    #         #     # draw_graph(T2[k2], names)
-    #         #     # plt.show()
-    #         #     # print((k1, k2))
-    #         # print("1", k1, k2)
-    #         if nx.is_isomorphic(T1[k1], T2[k2], node_match=node_match, edge_match=edge_match):  # match weights
-    #         # if nx.is_isomorphic(T1[k1], T2[k2]):
-    #             matches.append((k1, k2))
-    #         else:
-    #             diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
-    #             if 0 < diff <= 2:
-    #                 for n in T1[k1].nodes:
-    #                     T_tmp = nx.Graph(T1[k1])
-    #                     T_tmp.remove_node(n)
-    #                     # print("2", k1, k2)
-    #                     if nx.is_isomorphic(T2[k2], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
-    #                         # if nx.is_isomorphic(T1[k1], T2[k2]):
-    #                         matches.append((k1, k2))
-    #                         break
-    #             elif -2 < diff <= 0:
-    #                 for n in T2[k2].nodes:
-    #                     T_tmp = nx.Graph(T2[k2])
-    #                     T_tmp.remove_node(n)
-    #                     # print("3", k1, k2)
-    #                     if nx.is_isomorphic(T1[k1], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
-    #                         # if nx.is_isomorphic(T1[k1], T2[k2]):
-    #                         matches.append((k1, k2))
-    #                         break
-    #         # print(f'isomorphic: {k1}, {k2}')
+    cv2.putText(th_mg1, names[0],  (100,100) , cv2.FONT_HERSHEY_SIMPLEX, 4, color=(0,0,255), thickness=3)
+    cv2.putText(th_mg2, names[1],  (100,100) , cv2.FONT_HERSHEY_SIMPLEX, 4, color=(0,0,255), thickness=3)
+    w = 75
+    for m in matches:
+        vx1 = m.split('_')[-1]
+        vx2 = matches[m][0].split('_')[-1]
+        px1 = p1[int(vx1)]
+        px2 = p2[int(vx2)]
+        color = np.random.choice(range(256), size=3).tolist()
+        cv2.rectangle(th_mg1, (px1[0] - w, px1[1]- w), (px1[0] + w, px1[1] + w), color=color, thickness=4)
+        cv2.rectangle(th_mg2, (px2[0]- w, px2[1]- w), (px2[0] + w, px2[1] + w), color=color, thickness=4)
+        cv2.putText(th_mg1, f'{vx2}', (px1[0] + 100, px1[1]), cv2.FONT_HERSHEY_SIMPLEX, 3, color=color, thickness=3)
+        cv2.putText(th_mg2, f'{vx1}', (px2[0] + 100, px2[1]), cv2.FONT_HERSHEY_SIMPLEX, 3, color=color, thickness=3)
+
+    if th_mg1.shape < th_mg2.shape:
+        tmp =  np.zeros(th_mg2.shape, dtype=th_mg2.dtype)
+        tmp[0:th_mg1.shape[0], 0:th_mg1.shape[1], 0:th_mg1.shape[2]] = th_mg1
+        th_mg1 = tmp
+    elif th_mg1.shape > th_mg2.shape:
+        tmp = np.zeros(th_mg1.shape, dtype=th_mg2.dtype)
+        tmp[0:th_mg2.shape[0], 0:th_mg2.shape[1], 0:th_mg2.shape[2]] = th_mg2
+        th_mg2 = tmp
+    white = [255, 255, 255]
+    th_mg1 = cv2.copyMakeBorder(th_mg1, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    th_mg2 = cv2.copyMakeBorder(th_mg2, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    images = np.concatenate((th_mg1, th_mg2), axis=1)
+    nm1 = names[0].split('.')[0]
+    nm2 = names[1].split('.')[0]
+    cv2.imwrite(f'./output/matches_{nm1}_{nm2}.jpg', images)
+
+    return matches
+
+
+def find_match_alg2(scans, names):
+    """
+        Using graph isomorphism
+        :param scans:
+        :param names:
+        :return:
+        """
+    T1 = scans[0][0]
+    T2 = scans[1][0]
+    # em = iso.categorical_edge_match('weight', 'weight')
+    # em = lambda x,y: abs(x['weight'] - y['weight']) < threshold
+    # nm = lambda x, y: abs(x['bright'] - y['bright']) < 0.3 and abs(x['radius'] - y['radius']) < 2
+    matches = {}
+    for k1 in T1:
+        for k2 in T2:
+            # GM = iso.GraphMatcher(T1[k1], T2[k2], edge_match=em)
+            # if GM.subgraph_is_isomorphic():
+            #     # draw_graph(T1[k1], names)
+            #     # draw_graph(T2[k2], names)
+            #     # plt.show()
+            #     # print((k1, k2))
+            # print("1", k1, k2)
+            if nx.is_isomorphic(T1[k1], T2[k2], node_match=node_match, edge_match=edge_match):  # match weights
+            # if nx.is_isomorphic(T1[k1], T2[k2]):
+                matches.append((k1, k2))
+            else:
+                diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
+                if 0 < diff <= 2:
+                    for n in T1[k1].nodes:
+                        T_tmp = nx.Graph(T1[k1])
+                        T_tmp.remove_node(n)
+                        # print("2", k1, k2)
+                        if nx.is_isomorphic(T2[k2], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
+                            # if nx.is_isomorphic(T1[k1], T2[k2]):
+                            matches.append((k1, k2))
+                            break
+                elif -2 < diff <= 0:
+                    for n in T2[k2].nodes:
+                        T_tmp = nx.Graph(T2[k2])
+                        T_tmp.remove_node(n)
+                        # print("3", k1, k2)
+                        if nx.is_isomorphic(T1[k1], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
+                            # if nx.is_isomorphic(T1[k1], T2[k2]):
+                            matches.append((k1, k2))
+                            break
+            # print(f'isomorphic: {k1}, {k2}')
 
     th_mg1 = scans[0][1]
     th_mg1 = cv2.cvtColor(th_mg1, cv2.COLOR_GRAY2RGB)

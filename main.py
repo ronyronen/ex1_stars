@@ -51,7 +51,9 @@ if __name__ == '__main__':
             print(f'Match: {im1_name} -> {im2_name}')
             scans.append(scan_image(im2_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=False, draw_graph_flag=False))
 
-            matches = find_match(scans, (im1_name, im2_name), dist_error)
+            # There are two function: alg1 and alg2.
+            matches = find_match_alg1(scans, (im1_name, im2_name))
+            # matches = find_match_alg2(scans, (im1_name, im2_name))
             for m in matches:
                 s_1 = m.split('_')[-1]
                 s_2 = matches[m][0].split('_')[-1]
