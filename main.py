@@ -43,7 +43,7 @@ if __name__ == '__main__':
     for i in range(len(image_list)):
         im1_name = image_list[i].strip('./')
         scan1 = scan_image(im1_name, threshold=brightness, radius=radius, s_min=s_min, s_max=s_max, rotate=False,
-                                draw_graph_flag=True)
+                                draw_graph_flag=False)
         for j in range(i+1, len(image_list)):
             scans = []
             scans.append(scan1)

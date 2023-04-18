@@ -257,8 +257,8 @@ def find_match_alg1(scans, names):
         tmp[0:th_mg2.shape[0], 0:th_mg2.shape[1], 0:th_mg2.shape[2]] = th_mg2
         th_mg2 = tmp
     white = [255, 255, 255]
-    th_mg1 = cv2.copyMakeBorder(th_mg1, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
-    th_mg2 = cv2.copyMakeBorder(th_mg2, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    th_mg1 = cv2.copyMakeBorder(th_mg1, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=white)
+    th_mg2 = cv2.copyMakeBorder(th_mg2, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=white)
     images = np.concatenate((th_mg1, th_mg2), axis=1)
     nm1 = names[0].split('.')[0]
     nm2 = names[1].split('.')[0]
@@ -291,7 +291,7 @@ def find_match_alg2(scans, names):
             # print("1", k1, k2)
             if nx.is_isomorphic(T1[k1], T2[k2], node_match=node_match, edge_match=edge_match):  # match weights
             # if nx.is_isomorphic(T1[k1], T2[k2]):
-                matches.append((k1, k2))
+                matches[k1] = k2
             else:
                 diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
                 if 0 < diff <= 2:
@@ -301,7 +301,7 @@ def find_match_alg2(scans, names):
                         # print("2", k1, k2)
                         if nx.is_isomorphic(T2[k2], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
                             # if nx.is_isomorphic(T1[k1], T2[k2]):
-                            matches.append((k1, k2))
+                            matches[k1] = k2
                             break
                 elif -2 < diff <= 0:
                     for n in T2[k2].nodes:
@@ -310,7 +310,7 @@ def find_match_alg2(scans, names):
                         # print("3", k1, k2)
                         if nx.is_isomorphic(T1[k1], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
                             # if nx.is_isomorphic(T1[k1], T2[k2]):
-                            matches.append((k1, k2))
+                            matches[k1] = k2
                             break
             # print(f'isomorphic: {k1}, {k2}')
 
@@ -344,8 +344,8 @@ def find_match_alg2(scans, names):
         tmp[0:th_mg2.shape[0], 0:th_mg2.shape[1], 0:th_mg2.shape[2]] = th_mg2
         th_mg2 = tmp
     white = [255, 255, 255]
-    th_mg1 = cv2.copyMakeBorder(th_mg1, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
-    th_mg2 = cv2.copyMakeBorder(th_mg2, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=white)
+    th_mg1 = cv2.copyMakeBorder(th_mg1, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=white)
+    th_mg2 = cv2.copyMakeBorder(th_mg2, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=white)
     images = np.concatenate((th_mg1, th_mg2), axis=1)
     nm1 = names[0].split('.')[0]
     nm2 = names[1].split('.')[0]
