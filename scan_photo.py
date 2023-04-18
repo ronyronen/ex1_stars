@@ -58,13 +58,18 @@ def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=F
     i = 0
     p, b ,r  = [], [], []
     for c in contours:
-        area = cv2.contourArea(c)
-        area = int(area / 2)
-        if s_min < area < s_max:
+        area = cv2.contourArea(c) # if more than pixel
+        length = cv2.arcLength(c, False) # if only pixel...
+        cx, cy = 0, 0
+        if s_min <= area <= s_max:
             # cv2.drawContours(img, [c], -1, (255, 0, 0), 3)
             M = cv2.moments(c)
             cx = int(M["m10"] / M["m00"])
             cy = int(M["m01"] / M["m00"])
+        elif length > 2:
+            cx, cy = cv2.boundingRect(c)[:2]
+
+        if cx > 0 and cy > 0:
             p.append((cx, cy))
             brightness = round(image[cy,cx] / 255, 2)
             b.append(brightness)
@@ -75,11 +80,12 @@ def scan_image(img_name, threshold=100, radius=750, s_min=5, s_max=100, rotate=F
             logfile.write(f'{i}, {cx}, {cy}, {area}, {brightness}\n')
             i += 1
 
+
     # save images
     images = np.concatenate((image, th_img), axis=1)
     cv2.imwrite(f'./output/{image_name}_th.jpg', images)
 
-    radius = int(min(image.shape[0], image.shape[1]) / 4)
+    radius = int(min(image.shape[0], image.shape[1]) / 2)
     trees = create_mst(np.asarray(p), radius, b, r, image_name, draw_graph_flag)
 
     # return the threshold image
@@ -113,6 +119,16 @@ def create_mst(data, radius=1000, brightness=None, area=None, image_name="_", dr
         edges = list()
         vxs.append((vx_id, {'bright': brightness[vx_id], 'radius' : area[vx_id]}))
         vx2_ids = paires[paires[:, 0] == vx_id][:,1]
+        # build graph only if their 2 or more neighbours
+        if len(vx2_ids) < 2:
+            continue
+        elif len(vx2_ids) > 4:
+            vx4_id = {}
+            for key in vx2_ids:
+                value = brightness[key]
+                vx4_id[key] = value
+            vx2_ids = dict(sorted(vx4_id.items(), key=lambda item: item[1])[-4:]).keys()
+
         for vx2_id in vx2_ids:
             vxs.append((vx2_id, {'bright' : brightness[vx2_id], 'radius' : area[vx2_id]}))
             edges.append((vx_id, vx2_id, int(dist[vx_id, vx2_id])))
@@ -158,14 +174,15 @@ def create_mst(data, radius=1000, brightness=None, area=None, image_name="_", dr
 
 def edge_match(x, y):
     w_diff = abs(x['weight'] - y['weight'])
-    em = w_diff < 20
+    m_diff = max(x['weight'], y['weight'])
+    em = w_diff < 35
     # print (f'em: {em}, x_w: {x["weight"]}, y_w: {y["weight"]}')
     return em
 
 def node_match(x, y):
     r_diff = abs(x['radius'] - y['radius'])
     m_diff = max(x['radius'], y['radius'])
-    nm = abs(x['bright'] - y['bright']) <= 0.3 and r_diff <= int(m_diff/2)
+    nm = abs(x['bright'] - y['bright']) < 0.4 and r_diff < m_diff
     # print(f'nm: {nm}, x: {x["bright"]}:{x["radius"]}, y: {y["bright"]}:{y["radius"]}')
     return nm
 
@@ -176,40 +193,72 @@ def find_match(scans, names, threshold=100):
     # em = iso.categorical_edge_match('weight', 'weight')
     # em = lambda x,y: abs(x['weight'] - y['weight']) < threshold
     # nm = lambda x, y: abs(x['bright'] - y['bright']) < 0.3 and abs(x['radius'] - y['radius']) < 2
-    matches = []
+    matches = {}
     for k1 in T1:
         for k2 in T2:
-            # GM = iso.GraphMatcher(T1[k1], T2[k2], edge_match=em)
-            # if GM.subgraph_is_isomorphic():
-            #     # draw_graph(T1[k1], names)
-            #     # draw_graph(T2[k2], names)
-            #     # plt.show()
-            #     # print((k1, k2))
-            # print("1", k1, k2)
-            if nx.is_isomorphic(T1[k1], T2[k2], node_match=node_match, edge_match=edge_match):  # match weights
-            # if nx.is_isomorphic(T1[k1], T2[k2]):
-                matches.append((k1, k2))
-            else:
-                diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
-                if 0 < diff <= 2:
-                    for n in T1[k1].nodes:
-                        T_tmp = nx.Graph(T1[k1])
-                        T_tmp.remove_node(n)
-                        # print("2", k1, k2)
-                        if nx.is_isomorphic(T2[k2], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
-                            # if nx.is_isomorphic(T1[k1], T2[k2]):
-                            matches.append((k1, k2))
-                            break
-                elif -2 < diff <= 0:
-                    for n in T2[k2].nodes:
-                        T_tmp = nx.Graph(T2[k2])
-                        T_tmp.remove_node(n)
-                        # print("3", k1, k2)
-                        if nx.is_isomorphic(T1[k1], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
-                            # if nx.is_isomorphic(T1[k1], T2[k2]):
-                            matches.append((k1, k2))
-                            break
-            # print(f'isomorphic: {k1}, {k2}')
+            n1 = dict(T1[k1].nodes().data())
+            n2 = dict(T2[k2].nodes().data())
+            n1_keys = list(n1.keys())
+            n2_keys = list(n2.keys())
+            if abs(len(n1) - len(n2)) < 2:
+                if node_match(n1[n1_keys[0]], n2[n2_keys[0]]):
+                    count = 1
+                    match_node_ids = []
+                    for x, node1 in enumerate(list(n1.values())[1:]):
+                        for y, node2 in enumerate(list(n2.values())[1:]):
+                            node1_id = n1_keys[x + 1]
+                            e1 = T1[k1].get_edge_data(n1_keys[0], node1_id)
+                            node2_id = n2_keys[y + 1]
+                            e2 = T2[k2].get_edge_data(n2_keys[0], node2_id)
+                            # print(n1_keys[0], n1_keys[x+1], n2_keys[0], n2_keys[y+1])
+                            if node2_id not in match_node_ids and node_match(node1, node2) and edge_match(e1, e2):
+                                match_node_ids.append(node2_id)
+                                count += 1
+                                break
+                    # print(count)
+                    if count >= min(len(n1_keys), len(n2_keys)) - 2:
+                        if k1 in matches:
+                            c = matches[k1][1]
+                            if c > count:
+                                matches[k1] = k2, count
+                        else:
+                            matches[k1] = k2, count
+
+
+    # **** #
+    # for k1 in T1:
+    #     for k2 in T2:
+    #         # GM = iso.GraphMatcher(T1[k1], T2[k2], edge_match=em)
+    #         # if GM.subgraph_is_isomorphic():
+    #         #     # draw_graph(T1[k1], names)
+    #         #     # draw_graph(T2[k2], names)
+    #         #     # plt.show()
+    #         #     # print((k1, k2))
+    #         # print("1", k1, k2)
+    #         if nx.is_isomorphic(T1[k1], T2[k2], node_match=node_match, edge_match=edge_match):  # match weights
+    #         # if nx.is_isomorphic(T1[k1], T2[k2]):
+    #             matches.append((k1, k2))
+    #         else:
+    #             diff = T1[k1].number_of_nodes() - T2[k2].number_of_nodes()
+    #             if 0 < diff <= 2:
+    #                 for n in T1[k1].nodes:
+    #                     T_tmp = nx.Graph(T1[k1])
+    #                     T_tmp.remove_node(n)
+    #                     # print("2", k1, k2)
+    #                     if nx.is_isomorphic(T2[k2], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
+    #                         # if nx.is_isomorphic(T1[k1], T2[k2]):
+    #                         matches.append((k1, k2))
+    #                         break
+    #             elif -2 < diff <= 0:
+    #                 for n in T2[k2].nodes:
+    #                     T_tmp = nx.Graph(T2[k2])
+    #                     T_tmp.remove_node(n)
+    #                     # print("3", k1, k2)
+    #                     if nx.is_isomorphic(T1[k1], T_tmp, node_match=node_match, edge_match=edge_match):  # match weights
+    #                         # if nx.is_isomorphic(T1[k1], T2[k2]):
+    #                         matches.append((k1, k2))
+    #                         break
+    #         # print(f'isomorphic: {k1}, {k2}')
 
     th_mg1 = scans[0][1]
     th_mg1 = cv2.cvtColor(th_mg1, cv2.COLOR_GRAY2RGB)
@@ -222,8 +271,8 @@ def find_match(scans, names, threshold=100):
     cv2.putText(th_mg2, names[1],  (100,100) , cv2.FONT_HERSHEY_SIMPLEX, 4, color=(0,0,255), thickness=3)
     w = 75
     for m in matches:
-        vx1 = m[0].split('_')[-1]
-        vx2 = m[1].split('_')[-1]
+        vx1 = m.split('_')[-1]
+        vx2 = matches[m][0].split('_')[-1]
         px1 = p1[int(vx1)]
         px2 = p2[int(vx2)]
         color = np.random.choice(range(256), size=3).tolist()
