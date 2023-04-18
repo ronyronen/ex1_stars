@@ -39,7 +39,7 @@ Create a library that takes two images and calculates the best match between the
 
 ## Example
 - Running the application on fr1.jpg and fr2.jpg. i.e.: main.py fr1.jpg fr2.jpg will produce the following:
-- Output: [result.csv](examples/result.csv)
+- Output: [result.csv](examples/results.csv)
 - Stars identified CSV file: [fr1.csv](examples/fr1.csv)
 - Stars identified Image file: ![fr1_th.jpg](examples/fr1_th.jpg)
 - Match Image: ![matches_fr1_fr2.jpg](examples/matches_fr1_fr2.jpg)
