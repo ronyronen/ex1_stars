@@ -42,10 +42,11 @@ Create a library that takes two images and calculates the best match between the
 
 ## Improvements
 - There are some further improvements required in order to perfect the matching process.
-- I've tested two matching algorithms:
-  - Graph Isomorphism.
-  - Own implementation of matching edges and nodes.
-  - Graph isomorphism requires that all the nodes in one graph be present in the second graph. This has caused an issue as there are neighbors that are not present in both graphs. Therefore, I implemented my own matching algorithm that picks the most suitable candidate for a matching.
+- I have evaluated two matching algorithms:
+  - Graph Isomorphism
+  - A custom implementation that matches edges and nodes
+  - However, the Graph Isomorphism algorithm posed a challenge since it requires all nodes in one graph to be present in the other. This created a problem as there were neighboring nodes that were not present in both graphs. As a solution, I developed my own matching algorithm that selects the most appropriate candidate for a match.
+- An additional enhancement could involve incorporating the angle formed between a star and its neighboring stars as a feature to further refine the matching process.
 
 ## Example
 - Running the application on fr1.jpg and fr2.jpg. i.e.: main.py fr1.jpg fr2.jpg will produce the following:
